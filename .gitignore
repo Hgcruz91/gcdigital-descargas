@@ -1,0 +1,5 @@
+# Nunca subir instaladores al repositorio: van en el release «ultima».
+*.apk
+*.exe
+*.dmg
+*.aab

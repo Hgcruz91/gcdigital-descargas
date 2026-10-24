@@ -1,0 +1,48 @@
+# Publica la última versión de cada app de GC Digital en el release «ultima» de este
+# repositorio, con nombres fijos, para que gc-digital.mx/descargar/<app> siempre baje la última:
+#   Copal.apk · CosteoArtesanal.apk · AjoloteFiscal-Windows.exe
+#   AjoloteFiscal-Mac-Apple.dmg (M1 en adelante) · AjoloteFiscal-Mac-Intel.dmg
+# Toma los APK del último build terminado en Expo (perfil «preview») y los instaladores de la
+# última corrida exitosa de «Ajolote para Windows» y «Ajolote para Mac». Solo sube lo que cambió.
+# Secretos: EXPO_TOKEN (expo.dev › Access tokens) y DESCARGAS_TOKEN (token de GitHub de solo
+# lectura de Ajolote-Fiscal, Copal y costeo-artesanal: Contents y Actions).
+name: Publicar descargas
+
+on:
+  schedule:
+    - cron: "17 13 * * *"   # todos los días, 7:17 de la mañana en la Ciudad de México
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: publicar
+  cancel-in-progress: false
+
+jobs:
+  publicar:
+    runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ secrets.DESCARGAS_TOKEN }}
+      EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: "22"
+
+      - name: Revisar los secretos
+        run: |
+          [ -n "$GH_TOKEN" ] || { echo "::error title=Descargas::Falta el secreto DESCARGAS_TOKEN"; exit 1; }
+          [ -n "$EXPO_TOKEN" ] || { echo "::error title=Descargas::Falta el secreto EXPO_TOKEN"; exit 1; }
+          npm install -g eas-cli@latest >/dev/null
+
+      - name: Juntar la última versión de cada app
+        run: bash herramientas/juntar.sh "$RUNNER_TEMP/nuevo"
+
+      - name: Subir lo que cambió al release «ultima»
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: bash herramientas/subir.sh "$RUNNER_TEMP/nuevo"
