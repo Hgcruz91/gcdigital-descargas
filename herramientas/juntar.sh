@@ -15,7 +15,11 @@ apk() {  # repo carpeta_app nombre_fijo
   if ! gh api "repos/Hgcruz91/$repo/contents/${sub}app.json" --jq .content | base64 -d > "$TMP/$repo.app.json"; then
     echo "::warning title=Descargas::No pude leer app.json de $repo"; return
   fi
-  mkdir -p "$dir"; cp "$TMP/$repo.app.json" "$dir/app.json"
+  mkdir -p "$dir"
+  # Solo lo que eas necesita para ubicar el proyecto: sin plugins (no hay node_modules aquí).
+  node -e 'const a=JSON.parse(require("fs").readFileSync(process.argv[1],"utf8")).expo;
+    const e={name:a.name,slug:a.slug,owner:a.owner,version:a.version,extra:{eas:(a.extra||{}).eas}};
+    require("fs").writeFileSync(process.argv[2],JSON.stringify({expo:e}))' "$TMP/$repo.app.json" "$dir/app.json"
   gh api "repos/Hgcruz91/$repo/contents/${sub}eas.json" --jq .content | base64 -d > "$dir/eas.json" 2>/dev/null || true
   echo '{"name":"descargas","private":true}' > "$dir/package.json"
   local lista
