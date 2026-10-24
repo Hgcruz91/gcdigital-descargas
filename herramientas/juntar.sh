@@ -19,7 +19,7 @@ apk() {  # repo carpeta_app nombre_fijo
   gh api "repos/Hgcruz91/$repo/contents/${sub}eas.json" --jq .content | base64 -d > "$dir/eas.json" 2>/dev/null || true
   echo '{"name":"descargas","private":true}' > "$dir/package.json"
   local lista
-  listar() { (cd "$dir" && eas build:list --platform android --status finished --limit 10 --json --non-interactive 2>"$TMP/$repo.err"); }
+  listar() { (cd "$dir" && eas build:list --platform android --status finished --limit 10 --json --non-interactive 2>"$TMP/$repo.err" || (EAS_DEBUG=1 eas build:list --platform android --limit 1 --non-interactive >>"$TMP/$repo.err" 2>&1; false)); }
   if ! lista=$(listar); then
     # Si eas-cli pide el paquete expo para leer la configuración, se instala solo ese (sin el resto de la app).
     local ver_expo
@@ -27,7 +27,7 @@ apk() {  # repo carpeta_app nombre_fijo
       | node -p 'JSON.parse(require("fs").readFileSync(0,"utf8")).dependencies.expo' 2>/dev/null)
     (cd "$dir" && npm install --no-save --ignore-scripts --no-audit --no-fund "expo@${ver_expo:-latest}" >/dev/null 2>&1)
     if ! lista=$(listar); then
-      echo "::warning title=Descargas::Expo no respondió para $repo: $(grep -v '^\s*$' "$TMP/$repo.err" | head -c 900 | tr '\n' ' ')"; return
+      echo "::warning title=Descargas::Expo no respondió para $repo: $(grep -v '^\s*$' "$TMP/$repo.err" | head -c 600 | tr '\n' ' ') | $(echo "$lista" | head -c 600 | tr '\n' ' ')"; return
     fi
   fi
   local info
