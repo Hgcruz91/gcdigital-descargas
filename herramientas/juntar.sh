@@ -2,20 +2,28 @@
 # Deja en $1 los instaladores con nombre fijo y versiones.txt («archivo versión origen»).
 # Si una app no tiene versión lista, se avisa y se sigue con las demás.
 set -uo pipefail
+# Si algo truena, que GitHub muestre dónde (se ve en la corrida sin abrir el registro).
+trap 'c=$?; [ $c -ne 0 ] && echo "::error title=Descargas::Terminó con $c en la línea $LINENO: $BASH_COMMAND"' EXIT
+trap 'echo "::warning title=Descargas::Falló la línea $LINENO: $BASH_COMMAND"' ERR
 SALIDA="$1"; mkdir -p "$SALIDA"; : > "$SALIDA/versiones.txt"
 TMP="$(mktemp -d)"
 
 apk() {  # repo carpeta_app nombre_fijo
-  local repo="$1" sub="$2" fijo="$3" dir="$TMP/$repo"
+  local repo="$1" sub="$2" fijo="$3"
+  local dir="$TMP/$repo"
   # Solo la configuración de Expo, sin el código ni dependencias.
   if ! gh api "repos/Hgcruz91/$repo/contents/${sub}app.json" --jq .content | base64 -d > "$TMP/$repo.app.json"; then
     echo "::warning title=Descargas::No pude leer app.json de $repo"; return
   fi
-  mkdir -p "$dir"; cp "$TMP/$repo.app.json" "$dir/app.json"
+  mkdir -p "$dir"
+  # Solo lo que eas necesita para ubicar el proyecto: sin plugins (no hay node_modules aquí).
+  node -e 'const a=JSON.parse(require("fs").readFileSync(process.argv[1],"utf8")).expo;
+    const e={name:a.name,slug:a.slug,owner:a.owner,version:a.version,extra:{eas:(a.extra||{}).eas}};
+    require("fs").writeFileSync(process.argv[2],JSON.stringify({expo:e}))' "$TMP/$repo.app.json" "$dir/app.json"
   gh api "repos/Hgcruz91/$repo/contents/${sub}eas.json" --jq .content | base64 -d > "$dir/eas.json" 2>/dev/null || true
   echo '{"name":"descargas","private":true}' > "$dir/package.json"
   local lista
-  listar() { (cd "$dir" && eas build:list --platform android --status finished --limit 10 --json --non-interactive 2>"$TMP/$repo.err"); }
+  listar() { (cd "$dir" && eas build:list --platform android --status finished --limit 10 --json --non-interactive 2>"$TMP/$repo.err" || (EAS_DEBUG=1 eas build:list --platform android --limit 1 --non-interactive >>"$TMP/$repo.err" 2>&1; false)); }
   if ! lista=$(listar); then
     # Si eas-cli pide el paquete expo para leer la configuración, se instala solo ese (sin el resto de la app).
     local ver_expo
@@ -23,7 +31,7 @@ apk() {  # repo carpeta_app nombre_fijo
       | node -p 'JSON.parse(require("fs").readFileSync(0,"utf8")).dependencies.expo' 2>/dev/null)
     (cd "$dir" && npm install --no-save --ignore-scripts --no-audit --no-fund "expo@${ver_expo:-latest}" >/dev/null 2>&1)
     if ! lista=$(listar); then
-      echo "::warning title=Descargas::Expo no respondió para $repo: $(tail -c 300 "$TMP/$repo.err" | tr '\n' ' ')"; return
+      echo "::warning title=Descargas::Expo no respondió para $repo: $(grep -v '^\s*$' "$TMP/$repo.err" | head -c 600 | tr '\n' ' ') | $(echo "$lista" | head -c 600 | tr '\n' ' ')"; return
     fi
   fi
   local info
