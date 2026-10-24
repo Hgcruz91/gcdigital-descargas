@@ -2,6 +2,9 @@
 # Deja en $1 los instaladores con nombre fijo y versiones.txt («archivo versión origen»).
 # Si una app no tiene versión lista, se avisa y se sigue con las demás.
 set -uo pipefail
+# Si algo truena, que GitHub muestre dónde (se ve en la corrida sin abrir el registro).
+trap 'c=$?; [ $c -ne 0 ] && echo "::error title=Descargas::Terminó con $c en la línea $LINENO: $BASH_COMMAND"' EXIT
+trap 'echo "::warning title=Descargas::Falló la línea $LINENO: $BASH_COMMAND"' ERR
 SALIDA="$1"; mkdir -p "$SALIDA"; : > "$SALIDA/versiones.txt"
 TMP="$(mktemp -d)"
 
