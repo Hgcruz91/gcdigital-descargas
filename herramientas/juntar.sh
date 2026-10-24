@@ -27,7 +27,7 @@ apk() {  # repo carpeta_app nombre_fijo
       | node -p 'JSON.parse(require("fs").readFileSync(0,"utf8")).dependencies.expo' 2>/dev/null)
     (cd "$dir" && npm install --no-save --ignore-scripts --no-audit --no-fund "expo@${ver_expo:-latest}" >/dev/null 2>&1)
     if ! lista=$(listar); then
-      echo "::warning title=Descargas::Expo no respondió para $repo: $(tail -c 300 "$TMP/$repo.err" | tr '\n' ' ')"; return
+      echo "::warning title=Descargas::Expo no respondió para $repo: $(grep -v '^\s*$' "$TMP/$repo.err" | head -c 900 | tr '\n' ' ')"; return
     fi
   fi
   local info
