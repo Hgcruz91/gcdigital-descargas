@@ -9,7 +9,8 @@ SALIDA="$1"; mkdir -p "$SALIDA"; : > "$SALIDA/versiones.txt"
 TMP="$(mktemp -d)"
 
 apk() {  # repo carpeta_app nombre_fijo
-  local repo="$1" sub="$2" fijo="$3" dir="$TMP/$repo"
+  local repo="$1" sub="$2" fijo="$3"
+  local dir="$TMP/$repo"
   # Solo la configuración de Expo, sin el código ni dependencias.
   if ! gh api "repos/Hgcruz91/$repo/contents/${sub}app.json" --jq .content | base64 -d > "$TMP/$repo.app.json"; then
     echo "::warning title=Descargas::No pude leer app.json de $repo"; return
