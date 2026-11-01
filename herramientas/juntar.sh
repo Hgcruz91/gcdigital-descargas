@@ -67,9 +67,35 @@ ajolote() {  # workflow
   done < <(find "$dir" -type f \( -name '*.exe' -o -name '*.dmg' \))
 }
 
+# El instalador de Windows que HG arma en su laptop (construir.bat) y sube a un release de
+# Ajolote-Fiscal (por ejemplo «v0.7»). Si es igual o más nuevo que el de GitHub Actions, se usa ese.
+ajolote_release() {
+  local dir="$TMP/release" tag f base ver actual
+  tag=$(gh api "repos/Hgcruz91/Ajolote-Fiscal/releases?per_page=10" \
+        --jq '[.[] | select(.draft == false and .prerelease == false and any(.assets[]; .name | endswith(".exe")))][0].tag_name // empty')
+  [ -n "$tag" ] || return 0
+  gh release download "$tag" -R Hgcruz91/Ajolote-Fiscal -p '*.exe' -D "$dir" \
+    || { echo "::warning title=Descargas::No pude bajar el .exe del release $tag"; return 0; }
+  f=$(find "$dir" -name '*.exe' | head -1)
+  [ -n "$f" ] || return 0
+  base=$(basename "$f")
+  ver=$(echo "$base" | grep -oE '[0-9]+(\.[0-9]+)+' | head -1)
+  ver=${ver:-${tag#v}}
+  actual=$(awk '$1 == "AjoloteFiscal-Windows.exe" {print $2}' "$SALIDA/versiones.txt" 2>/dev/null || true)
+  if [ -n "$actual" ] && [ "$(printf '%s\n%s\n' "$actual" "$ver" | sort -V | tail -1)" != "$ver" ]; then
+    echo "El release $tag ($ver) es más viejo que el de Actions ($actual): se queda el de Actions."
+    return 0
+  fi
+  grep -v '^AjoloteFiscal-Windows.exe ' "$SALIDA/versiones.txt" > "$TMP/v.txt" 2>/dev/null || true
+  mv "$TMP/v.txt" "$SALIDA/versiones.txt"
+  cp "$f" "$SALIDA/AjoloteFiscal-Windows.exe"
+  echo "AjoloteFiscal-Windows.exe $ver release:$tag" >> "$SALIDA/versiones.txt"
+}
+
 apk Copal "" Copal.apk
 apk costeo-artesanal "frontend/" CosteoArtesanal.apk
 ajolote windows.yml
 ajolote mac.yml
+ajolote_release
 echo "Esto se juntó:"; cat "$SALIDA/versiones.txt"
 [ -s "$SALIDA/versiones.txt" ] || { echo "::error title=Descargas::No se juntó ningún instalador"; exit 1; }
