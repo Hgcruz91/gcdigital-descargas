@@ -71,9 +71,12 @@ ajolote() {  # workflow
 # Ajolote-Fiscal (por ejemplo «v0.7»). Si es igual o más nuevo que el de GitHub Actions, se usa ese.
 ajolote_release() {
   local dir="$TMP/release" tag f base ver actual
-  tag=$(gh api "repos/Hgcruz91/Ajolote-Fiscal/releases?per_page=10" \
-        --jq '[.[] | select(.draft == false and .prerelease == false and any(.assets[]; .name | endswith(".exe")))][0].tag_name // empty')
-  [ -n "$tag" ] || return 0
+  local rel asset
+  rel=$(gh api "repos/Hgcruz91/Ajolote-Fiscal/releases?per_page=10" \
+        --jq '[.[] | select(.draft == false and .prerelease == false and any(.assets[]; .name | endswith(".exe")))][0]
+              | if . then "\(.tag_name) \([.assets[] | select(.name | endswith(".exe"))][0].id)" else empty end')
+  [ -n "$rel" ] || return 0
+  tag=${rel% *}; asset=${rel#* }   # el id del .exe cambia si se reemplaza en el mismo release
   gh release download "$tag" -R Hgcruz91/Ajolote-Fiscal -p '*.exe' -D "$dir" \
     || { echo "::warning title=Descargas::No pude bajar el .exe del release $tag"; return 0; }
   f=$(find "$dir" -name '*.exe' | head -1)
@@ -89,7 +92,7 @@ ajolote_release() {
   grep -v '^AjoloteFiscal-Windows.exe ' "$SALIDA/versiones.txt" > "$TMP/v.txt" 2>/dev/null || true
   mv "$TMP/v.txt" "$SALIDA/versiones.txt"
   cp "$f" "$SALIDA/AjoloteFiscal-Windows.exe"
-  echo "AjoloteFiscal-Windows.exe $ver release:$tag" >> "$SALIDA/versiones.txt"
+  echo "AjoloteFiscal-Windows.exe $ver release:$tag:$asset" >> "$SALIDA/versiones.txt"
 }
 
 apk Copal "" Copal.apk
