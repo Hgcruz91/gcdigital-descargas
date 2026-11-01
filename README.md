@@ -16,4 +16,9 @@ Cada app trae 15 días de prueba; después se activa con una clave. Precios y co
 [gc-digital.mx/comprar](https://gc-digital.mx/comprar).
 
 Para publicar a mano (por ejemplo, justo después de armar una versión): Actions › Publicar descargas › Run workflow.
+
+**Windows armado en la laptop** (`construir.bat`, para no gastar minutos de GitHub): en Ajolote-Fiscal ›
+Releases › Draft a new release, etiqueta `v<versión>` (por ejemplo `v0.7`), adjunta
+`AjoloteFiscal-Instalador-<versión>.exe` y Publish release. Luego corre Publicar descargas. Si ese
+release es igual o más nuevo que el último armado en GitHub, se publica ese.
 Necesita los secretos `EXPO_TOKEN` y `DESCARGAS_TOKEN` (solo lectura de los repositorios de las apps).
