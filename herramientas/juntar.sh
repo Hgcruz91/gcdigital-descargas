@@ -67,38 +67,40 @@ ajolote() {  # workflow
   done < <(find "$dir" -type f \( -name '*.exe' -o -name '*.dmg' \))
 }
 
-# El instalador de Windows que HG arma en su laptop (construir.bat) y sube a un release de
-# Ajolote-Fiscal (por ejemplo «v0.7»). Si es igual o más nuevo que el de GitHub Actions, se usa ese.
-ajolote_release() {
-  local dir="$TMP/release" tag f base ver actual
-  local rel asset
+# Instaladores de Ajolote subidos a un release de Ajolote-Fiscal (por ejemplo «v0.9.1»): el .exe que HG arma
+# en su laptop (construir.bat) y los .dmg que sube «Ajolote para Mac» (desde el 14 nov ya no los deja en
+# Artifacts, que llenaban el espacio gratis de GitHub). Si es igual o más nuevo que el de Actions, se usa ese.
+ajolote_release() {  # sufijo-del-archivo nombre-fijo
+  local sufijo="$1" fijo="$2" dir="$TMP/release-$2" tag f base ver actual rel asset
   rel=$(gh api "repos/Hgcruz91/Ajolote-Fiscal/releases?per_page=10" \
-        --jq '[.[] | select(.draft == false and .prerelease == false and any(.assets[]; .name | endswith(".exe")))][0]
-              | if . then "\(.tag_name) \([.assets[] | select(.name | endswith(".exe"))][0].id)" else empty end')
+        --jq "[.[] | select(.draft == false and .prerelease == false and any(.assets[]; .name | endswith(\"$sufijo\")))][0]
+              | if . then \"\\(.tag_name) \\([.assets[] | select(.name | endswith(\"$sufijo\"))][0].id)\" else empty end")
   [ -n "$rel" ] || return 0
-  tag=${rel% *}; asset=${rel#* }   # el id del .exe cambia si se reemplaza en el mismo release
-  gh release download "$tag" -R Hgcruz91/Ajolote-Fiscal -p '*.exe' -D "$dir" \
-    || { echo "::warning title=Descargas::No pude bajar el .exe del release $tag"; return 0; }
-  f=$(find "$dir" -name '*.exe' | head -1)
+  tag=${rel% *}; asset=${rel#* }   # el id del archivo cambia si se reemplaza en el mismo release
+  gh release download "$tag" -R Hgcruz91/Ajolote-Fiscal -p "*$sufijo" -D "$dir" \
+    || { echo "::warning title=Descargas::No pude bajar $fijo del release $tag"; return 0; }
+  f=$(find "$dir" -type f -name "*$sufijo" | head -1)
   [ -n "$f" ] || return 0
   base=$(basename "$f")
   ver=$(echo "$base" | grep -oE '[0-9]+(\.[0-9]+)+' | head -1)
   ver=${ver:-${tag#v}}
-  actual=$(awk '$1 == "AjoloteFiscal-Windows.exe" {print $2}' "$SALIDA/versiones.txt" 2>/dev/null || true)
+  actual=$(awk -v n="$fijo" '$1 == n {print $2}' "$SALIDA/versiones.txt" 2>/dev/null || true)
   if [ -n "$actual" ] && [ "$(printf '%s\n%s\n' "$actual" "$ver" | sort -V | tail -1)" != "$ver" ]; then
-    echo "El release $tag ($ver) es más viejo que el de Actions ($actual): se queda el de Actions."
+    echo "El release $tag ($ver) es más viejo que el de Actions ($actual): $fijo se queda con el de Actions."
     return 0
   fi
-  grep -v '^AjoloteFiscal-Windows.exe ' "$SALIDA/versiones.txt" > "$TMP/v.txt" 2>/dev/null || true
+  grep -v "^$fijo " "$SALIDA/versiones.txt" > "$TMP/v.txt" 2>/dev/null || true
   mv "$TMP/v.txt" "$SALIDA/versiones.txt"
-  cp "$f" "$SALIDA/AjoloteFiscal-Windows.exe"
-  echo "AjoloteFiscal-Windows.exe $ver release:$tag:$asset" >> "$SALIDA/versiones.txt"
+  cp "$f" "$SALIDA/$fijo"
+  echo "$fijo $ver release:$tag:$asset" >> "$SALIDA/versiones.txt"
 }
 
 apk Copal "" Copal.apk
 apk costeo-artesanal "frontend/" CosteoArtesanal.apk
 ajolote windows.yml
 ajolote mac.yml
-ajolote_release
+ajolote_release ".exe" AjoloteFiscal-Windows.exe
+ajolote_release "-Mac.dmg" AjoloteFiscal-Mac-Apple.dmg
+ajolote_release "-Mac-Intel.dmg" AjoloteFiscal-Mac-Intel.dmg
 echo "Esto se juntó:"; cat "$SALIDA/versiones.txt"
 [ -s "$SALIDA/versiones.txt" ] || { echo "::error title=Descargas::No se juntó ningún instalador"; exit 1; }
